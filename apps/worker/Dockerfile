@@ -21,8 +21,11 @@ COPY tsconfig.base.json ./
 # Install dependencies
 RUN npm ci --workspace=packages/shared --workspace=apps/worker
 
-# Build shared package first, then worker
+# Force a clean build of shared (defense against layer-cache staleness)
+RUN rm -rf packages/shared/dist apps/worker/dist
 RUN npm run build --workspace=packages/shared
 RUN npm run build --workspace=apps/worker
 
+# Run the built JS directly (bypasses npm start so env-file flags don't fight
+# Railway's injected env vars).
 CMD ["node", "apps/worker/dist/index.js"]
