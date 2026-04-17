@@ -8,6 +8,7 @@ import {
   upsertMarketSnapshots,
   upsertWeatherForecasts,
   upsertEVCalculations,
+  deleteEVCalculationsForEvents,
   logPollStart,
   logPollComplete,
 } from "./services/supabase";
@@ -60,7 +61,18 @@ async function pollCycle(): Promise<void> {
       return evToRow(ev, cityId || "", event?.eventDate || "");
     }).filter((row) => row.city_id !== "");
 
-    // 6. Upsert to Supabase
+    // 6. Sweep stale EV rows for events we saw but couldn't compute
+    //    (e.g. NWS/Open-Meteo disagreed past the spread threshold), then upsert fresh.
+    const fetchedEventTickers = events.map((e) => e.eventTicker);
+    const freshEventTickers = new Set(evResults.map((r) => r.eventTicker));
+    const skippedEventTickers = fetchedEventTickers.filter(
+      (t) => !freshEventTickers.has(t)
+    );
+    if (skippedEventTickers.length > 0) {
+      await deleteEVCalculationsForEvents(skippedEventTickers);
+    }
+
+    // 7. Upsert to Supabase
     const marketCount = await upsertMarketSnapshots(snapshotRows);
     const forecastCount = await upsertWeatherForecasts(forecastRows);
     const evCount = await upsertEVCalculations(evRows);

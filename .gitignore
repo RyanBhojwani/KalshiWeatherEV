@@ -38,3 +38,7 @@ yarn-error.log*
 
 # Supabase
 supabase/.temp/
+
+# Local agent/MCP config — contains personal access tokens
+.mcp.json
+.claude/

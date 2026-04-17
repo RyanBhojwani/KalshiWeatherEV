@@ -10,4 +10,4 @@ export const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 // Kalshi rate limits (basic tier)
 export const KALSHI_READ_RATE_LIMIT = 20; // per second
-export const KALSHI_DELAY_BETWEEN_REQUESTS_MS = 100; // safety margin between city fetches
+export const KALSHI_DELAY_BETWEEN_REQUESTS_MS = 500; // safety margin between city fetches

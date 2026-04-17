@@ -16,6 +16,7 @@ export interface BracketEV {
   weatherProb: number;
   forecastMean: number;
   forecastSigma: number;
+  forecastSpread: number | null; // |NWS - OpenMeteo| when both present
 
   // EV results
   evYes: number; // weatherProb - yesAsk

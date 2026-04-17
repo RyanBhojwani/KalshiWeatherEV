@@ -46,9 +46,11 @@ export interface NWSForecastPeriod {
 export interface CityForecast {
   citySlug: string;
   forecastDate: string; // YYYY-MM-DD
-  source: "open_meteo" | "nws";
+  source: string;
   highTempF: number;
   lowTempF: number | null;
   fetchedAt: string; // ISO datetime
   rawResponse?: unknown;
+  // Absolute |NWS - OpenMeteo| high temp spread. Only set on ensemble rows.
+  sourceSpreadF?: number;
 }

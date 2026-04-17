@@ -117,6 +117,26 @@ export async function upsertEVCalculations(
 }
 
 /**
+ * Delete ev_calculations rows for the given event tickers.
+ * Used to clear stale rows when an event is skipped this poll cycle
+ * (e.g., source forecasts disagreed beyond threshold).
+ */
+export async function deleteEVCalculationsForEvents(
+  eventTickers: string[]
+): Promise<void> {
+  if (eventTickers.length === 0) return;
+
+  const { error } = await getSupabase()
+    .from("ev_calculations")
+    .delete()
+    .in("event_ticker", eventTickers);
+
+  if (error) {
+    console.error("Failed to delete stale EV calculations:", error.message);
+  }
+}
+
+/**
  * Log the start of a poll cycle.
  */
 export async function logPollStart(): Promise<string> {

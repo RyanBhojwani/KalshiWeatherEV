@@ -69,15 +69,14 @@ function parseMarketBracket(market: KalshiMarket): TemperatureBracket {
 }
 
 /**
- * Extract the event date (YYYY-MM-DD) from a Kalshi event.
- * Uses strike_date if available, otherwise parses from event_ticker.
+ * Extract the measurement date (YYYY-MM-DD) from a Kalshi event.
  * Ticker format: KXHIGHNY-26APR17 → 2026-04-17
+ *
+ * Do NOT use event.strike_date — that is the settlement cutoff timestamp
+ * (next-day UTC ~8:00 or 03:59), which is always one calendar day after
+ * the measurement date. The ticker suffix is the authoritative source.
  */
 function extractEventDate(event: KalshiEvent): string {
-  if (event.strike_date) {
-    return event.strike_date.split("T")[0];
-  }
-
   // Parse from ticker: KXHIGHNY-26APR17
   const parts = event.event_ticker.split("-");
   if (parts.length >= 2) {

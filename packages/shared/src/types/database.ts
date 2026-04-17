@@ -65,6 +65,7 @@ export interface EVCalculationRow {
   weather_prob: number;
   forecast_mean: number;
   forecast_sigma: number;
+  forecast_spread_f: number | null;
   ev_yes: number;
   ev_no: number;
   best_edge: number;

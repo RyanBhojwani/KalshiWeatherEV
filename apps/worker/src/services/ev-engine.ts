@@ -25,30 +25,59 @@ function daysAhead(eventDate: string, timezone: string): number {
 }
 
 /**
- * Find the best Open-Meteo forecast for a given city and date.
- * Prefers Open-Meteo over NWS as the primary source.
+ * Weighted ensemble of NWS and Open-Meteo forecasts for a given city/date.
+ *
+ * Kalshi settles on NWS, so NWS carries the heavier weight. Open-Meteo acts
+ * as both a sanity check and a fallback when NWS is unavailable.
+ *
+ * Returns undefined when both sources disagree by more than
+ * MAX_SOURCE_SPREAD_F — the forecast is unreliable and we skip the event.
+ * When both are present but within tolerance, returns the weighted mean and
+ * tags the row with the observed spread so the caller can inflate sigma.
  */
+const NWS_WEIGHT = 0.7;
+const OPEN_METEO_WEIGHT = 0.3;
+const MAX_SOURCE_SPREAD_F = 10;
+
 function findForecast(
   forecasts: CityForecast[],
   citySlug: string,
   eventDate: string
 ): CityForecast | undefined {
-  // Prefer Open-Meteo (primary)
+  const nws = forecasts.find(
+    (f) =>
+      f.citySlug === citySlug &&
+      f.forecastDate === eventDate &&
+      f.source === "nws"
+  );
   const openMeteo = forecasts.find(
     (f) =>
       f.citySlug === citySlug &&
       f.forecastDate === eventDate &&
       f.source === "open_meteo"
   );
-  if (openMeteo) return openMeteo;
 
-  // Fallback to NWS
-  return forecasts.find(
-    (f) =>
-      f.citySlug === citySlug &&
-      f.forecastDate === eventDate &&
-      f.source === "nws"
-  );
+  if (nws && openMeteo) {
+    const spread = Math.abs(nws.highTempF - openMeteo.highTempF);
+    if (spread > MAX_SOURCE_SPREAD_F) {
+      console.warn(
+        `Skipping ${citySlug} ${eventDate}: source spread ${spread.toFixed(1)}°F > ${MAX_SOURCE_SPREAD_F}°F`
+      );
+      return undefined;
+    }
+    return {
+      citySlug,
+      forecastDate: eventDate,
+      source: "ensemble_nws0.7_om0.3",
+      highTempF:
+        NWS_WEIGHT * nws.highTempF + OPEN_METEO_WEIGHT * openMeteo.highTempF,
+      lowTempF: null,
+      fetchedAt: nws.fetchedAt,
+      sourceSpreadF: spread,
+    };
+  }
+
+  return nws || openMeteo;
 }
 
 /**
@@ -79,7 +108,14 @@ export function calculateEventEV(
   }
 
   const days = daysAhead(event.eventDate, city.timezone);
-  const sigma = selectSigma(city.sigmaDays, days);
+  const baseSigma = selectSigma(city.sigmaDays, days);
+  const spread = forecast.sourceSpreadF ?? null;
+  // Inflate sigma when NWS and Open-Meteo disagree: effective uncertainty
+  // combines model uncertainty and source uncertainty in quadrature.
+  const sigma =
+    spread !== null
+      ? Math.sqrt(baseSigma * baseSigma + (spread / 2) * (spread / 2))
+      : baseSigma;
   const mean = forecast.highTempF;
 
   const results: BracketEV[] = [];
@@ -116,6 +152,7 @@ export function calculateEventEV(
       weatherProb,
       forecastMean: mean,
       forecastSigma: sigma,
+      forecastSpread: spread,
       evYes: ev.evYes,
       evNo: ev.evNo,
       bestEdge: ev.bestEdge,
@@ -180,6 +217,7 @@ export function evToRow(
   weather_prob: number;
   forecast_mean: number;
   forecast_sigma: number;
+  forecast_spread_f: number | null;
   ev_yes: number;
   ev_no: number;
   best_edge: number;
@@ -202,6 +240,7 @@ export function evToRow(
     weather_prob: ev.weatherProb,
     forecast_mean: ev.forecastMean,
     forecast_sigma: ev.forecastSigma,
+    forecast_spread_f: ev.forecastSpread,
     ev_yes: ev.evYes,
     ev_no: ev.evNo,
     best_edge: ev.bestEdge,
